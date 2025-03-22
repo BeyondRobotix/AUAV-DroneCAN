@@ -1,10 +1,20 @@
 #include <Arduino.h>
 #include <dronecan.h>
 #include <IWatchdog.h>
+#include <Wire.h>
+#include <AllSensors_DLHR.h>
+
+#include "RunningAverage.h"
+
+AllSensors_DLHR pressureSensor(&Wire, AllSensors_DLHR::SensorType::DIFFERENTIAL, AllSensors_DLHR::SensorResolution::RESOLUTION_18_BITS, 10.0);
 
 DroneCAN dronecan;
 
 uint32_t looptime = 0;
+
+// moving average of the pressure sensor
+RunningAverage diffPres(100);
+RunningAverage diffTemp(100);
 
 /*
 This function is called when we receive a CAN message, and it's accepted by the shouldAcceptTransfer function.
@@ -12,27 +22,6 @@ We need to do boiler plate code in here to handle parameter updates and so on, b
 */
 static void onTransferReceived(CanardInstance *ins, CanardRxTransfer *transfer)
 {
-
-    // switch on data type ID to pass to the right handler function
-    // if (transfer->transfer_type == CanardTransferTypeRequest)
-    // check if we want to handle a specific service request
-    switch (transfer->data_type_id)
-    {
-
-    case UAVCAN_EQUIPMENT_AHRS_MAGNETICFIELDSTRENGTH_ID:
-    {
-        uavcan_equipment_ahrs_MagneticFieldStrength pkt{};
-        uavcan_equipment_ahrs_MagneticFieldStrength_decode(transfer, &pkt);
-        Serial.print(pkt.magnetic_field_ga[0], 4);
-        Serial.print(" ");
-        Serial.print(pkt.magnetic_field_ga[1], 4);
-        Serial.print(" ");
-        Serial.print(pkt.magnetic_field_ga[2], 4);
-        Serial.print(" ");
-        Serial.println();
-        break;
-    }
-    }
 
     DroneCANonTransferReceived(dronecan, ins, transfer);
 }
@@ -48,26 +37,26 @@ static bool shouldAcceptTransfer(const CanardInstance *ins,
                                  uint8_t source_node_id)
 
 {
-    if (transfer_type == CanardTransferTypeBroadcast)
-    {
-        // Check if we want to handle a specific broadcast packet
-        switch (data_type_id)
-        {
-        case UAVCAN_EQUIPMENT_AHRS_MAGNETICFIELDSTRENGTH_ID:
-        {
-            *out_data_type_signature = UAVCAN_EQUIPMENT_AHRS_MAGNETICFIELDSTRENGTH_SIGNATURE;
-            return true;
-        }
-        }
-    }
 
     return false || DroneCANshoudlAcceptTransfer(ins, out_data_type_signature, data_type_id, transfer_type, source_node_id);
+}
+
+void readSensor()
+{
+    pressureSensor.startMeasurement();
+    pressureSensor.readData(true);
+    
+    diffPres.addValue(pressureSensor.pressure);
+    diffTemp.addValue(pressureSensor.temperature);
 }
 
 void setup()
 {
     Serial.begin(115200);
     Serial.println("Node Start");
+
+    Wire.begin();
+    pressureSensor.setPressureUnit(AllSensors_DLHR::PressureUnit::PASCAL);
 
     dronecan.init(onTransferReceived, shouldAcceptTransfer);
 
@@ -78,29 +67,27 @@ void loop()
 {
     const uint32_t now = millis();
 
+    readSensor();
+
     // send our battery message at 10Hz
-    if (now - looptime > 100)
+    if (now - looptime > 50)
     {
         looptime = millis();
 
-        // collect MCU core temperature data
-        int32_t vref = __LL_ADC_CALC_VREFANALOG_VOLTAGE(analogRead(AVREF), LL_ADC_RESOLUTION_12B);
-        int32_t cpu_temp = __LL_ADC_CALC_TEMPERATURE(vref, analogRead(ATEMP), LL_ADC_RESOLUTION_12B);
-
-        // construct dronecan packet
-        uavcan_equipment_power_BatteryInfo pkt{};
-        pkt.voltage = now / 10000;
-        pkt.temperature = cpu_temp;
+        // send air data message
+        uavcan_equipment_air_data_RawAirData air_data{};
+        air_data.differential_pressure = diffPres.getAverage();
+        air_data.differential_pressure_sensor_temperature = diffTemp.getAverage();
 
         // boilerplate to send a message
-        uint8_t buffer[UAVCAN_EQUIPMENT_POWER_BATTERYINFO_MAX_SIZE];
-        uint32_t len = uavcan_equipment_power_BatteryInfo_encode(&pkt, buffer);
+        uint8_t buffer[UAVCAN_EQUIPMENT_AIR_DATA_RAWAIRDATA_MAX_SIZE];  // this is the maximum size of the message
+        uint32_t len = uavcan_equipment_air_data_RawAirData_encode(&air_data, buffer);
         static uint8_t transfer_id;
         canardBroadcast(&dronecan.canard,
-                        UAVCAN_EQUIPMENT_POWER_BATTERYINFO_SIGNATURE,
-                        UAVCAN_EQUIPMENT_POWER_BATTERYINFO_ID,
+                        UAVCAN_EQUIPMENT_AIR_DATA_RAWAIRDATA_SIGNATURE,
+                        UAVCAN_EQUIPMENT_AIR_DATA_RAWAIRDATA_ID,
                         &transfer_id,
-                        CANARD_TRANSFER_PRIORITY_LOW,
+                        CANARD_TRANSFER_PRIORITY_HIGH,
                         buffer,
                         len);
     }
@@ -108,3 +95,5 @@ void loop()
     dronecan.cycle();
     IWatchdog.reload();
 }
+
+
