@@ -9,7 +9,7 @@ AllSensors_DLHR pressureSensor(&Wire, AllSensors_DLHR::SensorType::DIFFERENTIAL,
 DroneCAN dronecan;
 
 uint32_t looptime = 0;
-
+uint32_t lastMeasurementTime = 0;
 
 /*
 This function is called when we receive a CAN message, and it's accepted by the shouldAcceptTransfer function.
@@ -38,7 +38,23 @@ static bool shouldAcceptTransfer(const CanardInstance *ins,
 
 void readSensor()
 {
-    pressureSensor.readData(true);
+    
+    if (millis() - lastMeasurementTime < 100)
+    {
+        if (!pressureSensor.isBusy())
+        {
+            pressureSensor.readData();
+
+            // Restart measurement
+            pressureSensor.startMeasurement(AllSensors_DLHR::MeasurementType::AVERAGE16);
+        }
+    }
+    else
+    {
+        // Measurement timeout measurement
+        pressureSensor.startMeasurement(AllSensors_DLHR::MeasurementType::AVERAGE16);
+        lastMeasurementTime = millis();
+    }
 }
 
 void setup()
@@ -53,7 +69,6 @@ void setup()
     delay(20);
 
     pressureSensor.setPressureUnit(AllSensors_DLHR::PressureUnit::PASCAL);
-    pressureSensor.startMeasurement(AllSensors_DLHR::MeasurementType::AVERAGE16);
 
     dronecan.init(onTransferReceived, shouldAcceptTransfer);
 
@@ -63,19 +78,17 @@ void setup()
 void loop()
 {
     const uint32_t now = millis();
+    readSensor();
 
     // send our battery message at 10Hz
     if (now - looptime > 50)
     {
         looptime = millis();
-        
-        readSensor();
-        pressureSensor.startMeasurement(AllSensors_DLHR::MeasurementType::AVERAGE16);
 
         // send air data message
         uavcan_equipment_air_data_RawAirData air_data{};
-        air_data.differential_pressure = pressureSensor.pressure;
-        air_data.differential_pressure_sensor_temperature = pressureSensor.temperature;
+        air_data.differential_pressure = pressureSensor.pressure; // in Pascals
+        air_data.differential_pressure_sensor_temperature = pressureSensor.temperature + 273.15; // convert to Kelvin
 
         // boilerplate to send a message
         uint8_t buffer[UAVCAN_EQUIPMENT_AIR_DATA_RAWAIRDATA_MAX_SIZE];  // this is the maximum size of the message
