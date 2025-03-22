@@ -77,6 +77,7 @@ public:
     void processTx();
     void processRx();
     void cycle();
+    void debug(const char *msg, uint8_t level = UAVCAN_PROTOCOL_DEBUG_LOGLEVEL_INFO);
 
     struct dynamic_node_allocation
     {

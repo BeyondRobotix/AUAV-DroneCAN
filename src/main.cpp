@@ -4,17 +4,12 @@
 #include <Wire.h>
 #include <AllSensors_DLHR.h>
 
-#include "RunningAverage.h"
-
 AllSensors_DLHR pressureSensor(&Wire, AllSensors_DLHR::SensorType::DIFFERENTIAL, AllSensors_DLHR::SensorResolution::RESOLUTION_18_BITS, 10.0);
 
 DroneCAN dronecan;
 
 uint32_t looptime = 0;
 
-// moving average of the pressure sensor
-RunningAverage diffPres(100);
-RunningAverage diffTemp(100);
 
 /*
 This function is called when we receive a CAN message, and it's accepted by the shouldAcceptTransfer function.
@@ -43,11 +38,7 @@ static bool shouldAcceptTransfer(const CanardInstance *ins,
 
 void readSensor()
 {
-    pressureSensor.startMeasurement();
     pressureSensor.readData(true);
-    
-    diffPres.addValue(pressureSensor.pressure);
-    diffTemp.addValue(pressureSensor.temperature);
 }
 
 void setup()
@@ -55,8 +46,14 @@ void setup()
     Serial.begin(115200);
     Serial.println("Node Start");
 
+    Wire.setSCL(PB_13);
+    Wire.setSDA(PB_14);
     Wire.begin();
+  
+    delay(20);
+
     pressureSensor.setPressureUnit(AllSensors_DLHR::PressureUnit::PASCAL);
+    pressureSensor.startMeasurement(AllSensors_DLHR::MeasurementType::AVERAGE16);
 
     dronecan.init(onTransferReceived, shouldAcceptTransfer);
 
@@ -67,17 +64,18 @@ void loop()
 {
     const uint32_t now = millis();
 
-    readSensor();
-
     // send our battery message at 10Hz
     if (now - looptime > 50)
     {
         looptime = millis();
+        
+        readSensor();
+        pressureSensor.startMeasurement(AllSensors_DLHR::MeasurementType::AVERAGE16);
 
         // send air data message
         uavcan_equipment_air_data_RawAirData air_data{};
-        air_data.differential_pressure = diffPres.getAverage();
-        air_data.differential_pressure_sensor_temperature = diffTemp.getAverage();
+        air_data.differential_pressure = pressureSensor.pressure;
+        air_data.differential_pressure_sensor_temperature = pressureSensor.temperature;
 
         // boilerplate to send a message
         uint8_t buffer[UAVCAN_EQUIPMENT_AIR_DATA_RAWAIRDATA_MAX_SIZE];  // this is the maximum size of the message
@@ -95,5 +93,3 @@ void loop()
     dronecan.cycle();
     IWatchdog.reload();
 }
-
-

@@ -38,7 +38,7 @@ class AllSensors_DLHR {
 public:
 
   // The default I2C address from the datasheet.
-  static const uint8_t I2C_ADDRESS = 0x29;
+  static const uint8_t I2C_ADDRESS = 0x26;
 
   // The sensor type, where part numbers:
   //   * DLHR-xxxG-* are GAGE sensors.
@@ -121,14 +121,14 @@ private:
   float transferPressure(unsigned long raw_value) {
     // Based on the following formula in the datasheet:
     //     Pressure(inH2O) = 1.25 x ((P_out_dig - OS_dig) / 2^24) x FSS(inH2O)
-    return 1.25 * (((float) raw_value - pressure_zero_ref) / FULL_SCALE_REF) * pressure_range;    
+    return 1.25 * (((float) raw_value - 0.5*FULL_SCALE_REF) / FULL_SCALE_REF) * pressure_range;    
   }
 
   // Convert a raw digital temperature read from the sensor to a floating point value in Celcius.
   float transferTemperature(unsigned long raw_value) {
     // Based on the following formula in the datasheet:
     //     Temperature(degC) = ((T_out_dig * 125) / 2^24) - 40
-    return (((float) raw_value * 125.0) / FULL_SCALE_REF) - 40.0;
+    return (((float) raw_value * 155.0) / FULL_SCALE_REF) - 45.0;
   }
 
   // Convert the input in inH2O to the configured pressure output unit.

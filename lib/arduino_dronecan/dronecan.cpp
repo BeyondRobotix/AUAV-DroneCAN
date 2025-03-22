@@ -590,6 +590,25 @@ void DroneCAN::processRx()
     }
 }
 
+void DroneCAN::debug(const char *msg, uint8_t level)
+{
+    uavcan_protocol_debug_LogMessage pkt{};
+    pkt.level.value = level;
+    pkt.text.len = strlen(msg);
+    strncpy((char *)pkt.text.data, msg, pkt.text.len);
+
+    uint8_t buffer[UAVCAN_PROTOCOL_DEBUG_LOGMESSAGE_MAX_SIZE];
+    uint32_t len = uavcan_protocol_debug_LogMessage_encode(&pkt, buffer);
+    static uint8_t transfer_id;
+    canardBroadcast(&canard,
+                    UAVCAN_PROTOCOL_DEBUG_LOGMESSAGE_SIGNATURE,
+                    UAVCAN_PROTOCOL_DEBUG_LOGMESSAGE_ID,
+                    &transfer_id,
+                    CANARD_TRANSFER_PRIORITY_LOW,
+                    buffer,
+                    len);
+}
+
 void DroneCANonTransferReceived(DroneCAN &dronecan, CanardInstance *ins, CanardRxTransfer *transfer)
 {
     if (transfer->transfer_type == CanardTransferTypeBroadcast)
@@ -720,3 +739,5 @@ bool DroneCANshoudlAcceptTransfer(const CanardInstance *ins,
         }
     }
 }
+
+

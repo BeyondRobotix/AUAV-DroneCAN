@@ -8,14 +8,16 @@ This isn't intended to be used in the same way as AP_Periph, which supports tons
 
 ## Features
 
+API changes can happen at any time in master. See the releases page to download a specific verison for your project. Once we've solved firmware updates over CAN we'll release a V1 version!
+
 - Send DroneCAN messages ✅
 - Receive DroneCAN messages ✅
 - Send NodeStatus ✅
 - Respond to NodeInfo ✅
 - Reboot on reboot request ✅
-- Dynamic Node Allocation ✅ (handshake is slightly limited but works)
+- Dynamic Node Allocation ✅
 - DroneCAN Parameters ✅
-- Firmware update over CAN 🔨
+- Firmware update over CAN 🔨 (need a bootloader system...)
 - FreeRTOS examples 🔨
 - Example project set 🔨
 
@@ -26,10 +28,20 @@ This repository is plug and play with the Beyond Robotix CAN node series!
 
 See [Beyond Robotix Can Node](https://www.beyondrobotix.com/)
 
+Docs for the node hardware [CAN node gitbook](https://beyond-robotix.gitbook.io/docs/can-node-system)
+
 <img src="./assets/BR_CAN_NODE.png" width="50%">
 
+To get started:
+1. Install VScode
+2. Install the PlatformIO extension
+3. Clone/Download this repository
+4. Plug in the CAN node via USB or STLINK
+5. Click the upload button!
+6. The CAN Node will report a simulated battery CAN message to any Ardupilot/PX4/DroneCAN usb !
+7. Create your custom CAN application using Arduino libraries.. 
 
-## Usage
+## Code Usage
 
 Minimal boilerplate code needed, you can add you sensor messages easily!
 
@@ -39,52 +51,58 @@ See src/main.cpp for a full example, which reads in the built in STM32 MCU tempe
 #include <Arduino.h>
 #include <dronecan.h>
 
+DroneCAN dronecan;
+
+/*
+This function is called when we receive a CAN message, and it's accepted by the shouldAcceptTransfer function.
+We need to do boiler plate code in here to handle parameter updates and so on, but you can also write code to interact with sent messages here.
+*/
+static void onTransferReceived(CanardInstance *ins, CanardRxTransfer *transfer)
+{
+
+    DroneCANonTransferReceived(dronecan, ins, transfer);
+}
+
+/*
+For this function, we have to sign the signaure of any messages we want to recieve. We do the boilerplate handling for parameters etc. See main.cpp for an example on how to handle this.
+ */
 static bool shouldAcceptTransfer(const CanardInstance *ins,
                                  uint64_t *out_data_type_signature,
                                  uint16_t data_type_id,
                                  CanardTransferType transfer_type,
-                                 uint8_t source_node_id);
-static void onTransferReceived(CanardInstance *ins, CanardRxTransfer *transfer);
+                                 uint8_t source_node_id)
 
-DroneCAN dronecan;
+{
+    
+    return false || DroneCANshoudlAcceptTransfer(ins, out_data_type_signature, data_type_id, transfer_type, source_node_id);
+}
+
 
 void setup()
 {
     // Do your usual Arduino sensor initialisation here
+    
     dronecan.init(onTransferReceived, shouldAcceptTransfer);
 }
 
 void loop()
 {
     // Read your sensor data, and compose dronecan messages here
+
     dronecan.cycle();
-}
-
-void onTransferReceived(CanardInstance *ins, CanardRxTransfer *transfer)
-{
-    // describes what to do with received DroneCAN messages
-}
-
-bool shouldAcceptTransfer(const CanardInstance *ins,
-                          uint64_t *out_data_type_signature,
-                          uint16_t data_type_id,
-                          CanardTransferType transfer_type,
-                          uint8_t source_node_id)
-{
-    // can be used to filter what is passed to onTransferReceived
 }
 ```
 
 ## Support
 
-If you get stuck with this repository, the discussions section will allow people to help out.
+If you get stuck with this repository, the discussions section will allow us to help out.
 
 For dedicated engineering support on your application, contact [admin@beyondrobotix.com](admin@beyondrobotix.com).
 
 
 ## Repository structure
 
-This repository is designed to be cloned and run straight away using the example application in ./src/main.cpp
+This repository is designed to be cloned and run straight away using the example application in ./src/main.cpp.
 
 All 3 of the following libraries are required:
 
