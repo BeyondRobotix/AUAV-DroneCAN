@@ -46,8 +46,8 @@ void setup()
     Serial.begin(115200);
     Serial.println("Node Start");
 
-    Wire.setSCL(PB_13);
-    Wire.setSDA(PB_14);
+    Wire.setSCL(PIN_WIRE_SCL);
+    Wire.setSDA(PIN_WIRE_SDA);
     Wire.begin();
   
     delay(20);
