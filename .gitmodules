@@ -10,3 +10,9 @@
 [submodule "dronecan/DSDL"]
 	path = dronecan/DSDL
 	url = https://github.com/dronecan/DSDL.git
+[submodule "lib/ArduinoDroneCANlib"]
+	path = lib/ArduinoDroneCANlib
+	url = https://github.com/BeyondRobotix/ArduinoDroneCANlib.git
+[submodule "lib/AllSensors_AUAV"]
+	path = lib/AllSensors_AUAV
+	url = https://github.com/BeyondRobotix/AllSensors_AUAV.git
