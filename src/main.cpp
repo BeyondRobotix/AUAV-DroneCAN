@@ -2,14 +2,14 @@
 #include <dronecan.h>
 #include <IWatchdog.h>
 #include <Wire.h>
-#include <AllSensors_DLHR.h>
+#include <AllSensors_AUAV.h>
 
-AllSensors_DLHR pressureSensor(&Wire, AllSensors_DLHR::SensorType::DIFFERENTIAL, AllSensors_DLHR::SensorResolution::RESOLUTION_18_BITS, 10.0);
+AllSensors_AUAV pressureSensor(&Wire, AllSensors_AUAV::SensorPressureRange::L10D);
 
 DroneCAN dronecan;
 
-uint32_t looptime = 0;
-uint32_t lastMeasurementTime = 0;
+unsigned long looptime = 0;
+unsigned long now = 0;
 
 /*
 This function is called when we receive a CAN message, and it's accepted by the shouldAcceptTransfer function.
@@ -36,24 +36,14 @@ static bool shouldAcceptTransfer(const CanardInstance *ins,
     return false || DroneCANshoudlAcceptTransfer(ins, out_data_type_signature, data_type_id, transfer_type, source_node_id);
 }
 
-void readSensor()
+void readSensor(AllSensors_AUAV::SensorType type)
 {
-    
-    if (millis() - lastMeasurementTime < 100)
+    if (!pressureSensor.isBusy(type))
     {
-        if (!pressureSensor.isBusy())
-        {
-            pressureSensor.readData();
+        pressureSensor.readData(type);
 
-            // Restart measurement
-            pressureSensor.startMeasurement(AllSensors_DLHR::MeasurementType::AVERAGE16);
-        }
-    }
-    else
-    {
-        // Measurement timeout measurement
-        pressureSensor.startMeasurement(AllSensors_DLHR::MeasurementType::AVERAGE16);
-        lastMeasurementTime = millis();
+        // Restart measurement
+        pressureSensor.startMeasurement(type, AllSensors_AUAV::MeasurementType::AVERAGE16);
     }
 }
 
@@ -68,7 +58,8 @@ void setup()
   
     delay(20);
 
-    pressureSensor.setPressureUnit(AllSensors_DLHR::PressureUnit::PASCAL);
+    pressureSensor.setPressureUnit(AllSensors_AUAV::PressureUnit::PASCAL);
+    pressureSensor.setTemperatureUnit(AllSensors_AUAV::TemperatureUnit::KELVIN);
 
     dronecan.init(onTransferReceived, shouldAcceptTransfer);
 
@@ -77,8 +68,9 @@ void setup()
 
 void loop()
 {
-    const uint32_t now = millis();
-    readSensor();
+    now = millis();
+    readSensor(AllSensors_AUAV::SensorType::DIFFERENTIAL);
+    readSensor(AllSensors_AUAV::SensorType::ABSOLUTE);
 
     // send our battery message at 10Hz
     if (now - looptime > 50)
@@ -87,17 +79,46 @@ void loop()
 
         // send air data message
         uavcan_equipment_air_data_RawAirData air_data{};
-        air_data.differential_pressure = pressureSensor.pressure; // in Pascals
-        air_data.differential_pressure_sensor_temperature = pressureSensor.temperature + 273.15; // convert to Kelvin
+        air_data.differential_pressure = pressureSensor.pressure_d; // in Pascals
+        air_data.differential_pressure_sensor_temperature = pressureSensor.temperature_d; // Kelvin
+        air_data.static_pressure = pressureSensor.pressure_a; // in Pascals
+        air_data.static_air_temperature = pressureSensor.temperature_a; // Kelvin
 
-        // boilerplate to send a message
         uint8_t buffer[UAVCAN_EQUIPMENT_AIR_DATA_RAWAIRDATA_MAX_SIZE];  // this is the maximum size of the message
         uint32_t len = uavcan_equipment_air_data_RawAirData_encode(&air_data, buffer);
-        static uint8_t transfer_id;
+        static uint8_t transfer_id_air_data;
         canardBroadcast(&dronecan.canard,
                         UAVCAN_EQUIPMENT_AIR_DATA_RAWAIRDATA_SIGNATURE,
                         UAVCAN_EQUIPMENT_AIR_DATA_RAWAIRDATA_ID,
-                        &transfer_id,
+                        &transfer_id_air_data,
+                        CANARD_TRANSFER_PRIORITY_HIGH,
+                        buffer,
+                        len);
+
+        // Send Barometer pressure message
+        uavcan_equipment_air_data_StaticPressure barometer_data{};
+        barometer_data.static_pressure = pressureSensor.pressure_a; // in Pascals
+        static uint8_t transfer_id_static_pressure;
+
+        len = uavcan_equipment_air_data_StaticPressure_encode(&barometer_data, buffer);
+        canardBroadcast(&dronecan.canard,
+                        UAVCAN_EQUIPMENT_AIR_DATA_STATICPRESSURE_SIGNATURE,
+                        UAVCAN_EQUIPMENT_AIR_DATA_STATICPRESSURE_ID,
+                        &transfer_id_static_pressure,
+                        CANARD_TRANSFER_PRIORITY_HIGH,
+                        buffer,
+                        len);
+
+        // Send Barometer temperature message
+        uavcan_equipment_air_data_StaticTemperature temperature_data{};
+        temperature_data.static_temperature = pressureSensor.temperature_a; // in Kelvin    
+        static uint8_t transfer_id_static_temperature;
+
+        len = uavcan_equipment_air_data_StaticTemperature_encode(&temperature_data, buffer);
+        canardBroadcast(&dronecan.canard,
+                        UAVCAN_EQUIPMENT_AIR_DATA_STATICTEMPERATURE_SIGNATURE,
+                        UAVCAN_EQUIPMENT_AIR_DATA_STATICTEMPERATURE_ID,
+                        &transfer_id_static_temperature,
                         CANARD_TRANSFER_PRIORITY_HIGH,
                         buffer,
                         len);
