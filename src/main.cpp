@@ -10,6 +10,7 @@ DroneCAN dronecan;
 
 unsigned long looptime = 0;
 unsigned long now = 0;
+unsigned long last_msg_time = 0;
 
 /*
 This function is called when we receive a CAN message, and it's accepted by the shouldAcceptTransfer function.
@@ -38,13 +39,48 @@ static bool shouldAcceptTransfer(const CanardInstance *ins,
 
 void readSensor(AllSensors_AUAV::SensorType type)
 {
+
     if (!pressureSensor.isBusy(type))
     {
         pressureSensor.readData(type);
 
         // Restart measurement
-        pressureSensor.startMeasurement(type, AllSensors_AUAV::MeasurementType::AVERAGE16);
+        pressureSensor.startMeasurement(type, AllSensors_AUAV::MeasurementType::AVERAGE8);
+
+        switch (type)
+        {
+        case AllSensors_AUAV::SensorType::DIFFERENTIAL:
+            pressureSensor.last_message_diff = now;
+        break;
+        case AllSensors_AUAV::SensorType::ABSOLUTE:
+            pressureSensor.last_message_abs = now;
+        break;
+        default:
+            break;
+        }
+        return;
     }
+
+    switch (type)
+    {
+    case AllSensors_AUAV::SensorType::DIFFERENTIAL:
+        last_msg_time = pressureSensor.last_message_diff;
+        pressureSensor.last_message_diff = now;
+        break;
+    case AllSensors_AUAV::SensorType::ABSOLUTE:
+        last_msg_time = pressureSensor.last_message_abs;
+        pressureSensor.last_message_abs = now;
+        break;
+    default:
+        break;
+    }
+
+    // If we haven't received a message in the last second, restart the measurement
+    if (now - last_msg_time > 1000)
+    {
+        pressureSensor.startMeasurement(type, AllSensors_AUAV::MeasurementType::AVERAGE8);
+    }
+
 }
 
 void setup()
@@ -61,6 +97,11 @@ void setup()
     pressureSensor.setPressureUnit(AllSensors_AUAV::PressureUnit::PASCAL);
     pressureSensor.setTemperatureUnit(AllSensors_AUAV::TemperatureUnit::KELVIN);
 
+
+    pressureSensor.startMeasurement(AllSensors_AUAV::SensorType::DIFFERENTIAL, AllSensors_AUAV::MeasurementType::AVERAGE8);
+    pressureSensor.startMeasurement(AllSensors_AUAV::SensorType::ABSOLUTE, AllSensors_AUAV::MeasurementType::AVERAGE8);
+    
+
     dronecan.init(onTransferReceived, shouldAcceptTransfer);
 
     IWatchdog.begin(2000000); // if the loop takes longer than 2 seconds, reset the system
@@ -69,13 +110,15 @@ void setup()
 void loop()
 {
     now = millis();
-    readSensor(AllSensors_AUAV::SensorType::DIFFERENTIAL);
-    readSensor(AllSensors_AUAV::SensorType::ABSOLUTE);
+
 
     // send our battery message at 10Hz
     if (now - looptime > 50)
     {
         looptime = millis();
+        readSensor(AllSensors_AUAV::SensorType::ABSOLUTE);
+        readSensor(AllSensors_AUAV::SensorType::DIFFERENTIAL);
+        
 
         // send air data message
         uavcan_equipment_air_data_RawAirData air_data{};
