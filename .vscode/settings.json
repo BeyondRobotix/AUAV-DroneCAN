@@ -4,6 +4,12 @@
         "string": "cpp",
         "string_view": "cpp",
         "random": "cpp",
-        "system_error": "cpp"
+        "system_error": "cpp",
+        "compare": "cpp",
+        "functional": "cpp",
+        "ratio": "cpp",
+        "tuple": "cpp",
+        "type_traits": "cpp",
+        "utility": "cpp"
     }
 }
