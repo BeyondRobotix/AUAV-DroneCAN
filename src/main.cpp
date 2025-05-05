@@ -8,11 +8,12 @@ AllSensors_AUAV pressureSensor(&Wire, AllSensors_AUAV::SensorPressureRange::L10D
 
 DroneCAN dronecan;
 
-unsigned long looptime1 = 0;
-unsigned long looptime2 = 0;
+unsigned long lastLoopAbs = 0;
+unsigned long lastLoopDiff = 0;
 unsigned long now = 0;
 unsigned long last_msg_time_diff = 0;
 unsigned long last_msg_time_abs = 0;
+unsigned long last_msg_time_can = 0;
 
 /*
 This function is called when we receive a CAN message, and it's accepted by the shouldAcceptTransfer function.
@@ -122,21 +123,23 @@ void setup()
 void loop()
 {
     now = millis();
-    char error_msg[50];
 
-    // send our battery message at 10Hz
-    if (now - looptime2 > 100)
+    // Interogate sensor at 20 hz
+    if (now - lastLoopDiff > 50)
     {
         readSensor(AllSensors_AUAV::SensorType::DIFFERENTIAL);
+        lastLoopDiff = millis();
     }
 
-    if (now - looptime1 > 100)
+    if (now - lastLoopAbs > 100)
     {
-        looptime1 = millis();
-        looptime2 = millis() + 50;
-
         readSensor(AllSensors_AUAV::SensorType::ABSOLUTE);
+        lastLoopAbs = millis();
+    }
         
+    // Send messages every 100ms
+    if (now - last_msg_time_can > 100)
+    {
         // send air data message
         uavcan_equipment_air_data_RawAirData air_data{};
         air_data.differential_pressure = pressureSensor.pressure_d; // in Pascals
@@ -182,6 +185,8 @@ void loop()
                         CANARD_TRANSFER_PRIORITY_HIGH,
                         buffer,
                         len);
+
+        last_msg_time_can = millis();
     }
 
     dronecan.cycle();
