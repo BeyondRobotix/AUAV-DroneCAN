@@ -45,9 +45,10 @@ _Min_Stack_Size = 0x400; /* required amount of stack */
 /* Memories definition */
 MEMORY
 {
-  RAM    (xrw)    : ORIGIN = 0x20000000,   LENGTH = LD_MAX_DATA_SIZE
+  BOOTCOM (rw)    : ORIGIN = 0x20000000, LENGTH = 0x100
+  RAM    (xrw)    : ORIGIN = 0x20000100,   LENGTH = LD_MAX_DATA_SIZE - 0x100
   RAM2    (xrw)    : ORIGIN = 0x10000000,   LENGTH = 16K
-  FLASH    (rx)    : ORIGIN = 0x8000000 + LD_FLASH_OFFSET, LENGTH = LD_MAX_SIZE - LD_FLASH_OFFSET
+  FLASH    (rx)    : ORIGIN = 0x800A000 + LD_FLASH_OFFSET, LENGTH = LD_MAX_SIZE - LD_FLASH_OFFSET
 }
 
 /* Sections */
