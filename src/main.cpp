@@ -6,12 +6,14 @@
 #include <simple_dronecanmessages.h>
 #include <AllSensors_AUAV.h>
 
-AllSensors_AUAV pressureSensor(&Wire, AllSensors_AUAV::SensorPressureRange::L10D);
+AllSensors_AUAV pressureSensor(&Wire);
 
 // set up your parameters here with default values. NODEID should be kept
 std::vector<DroneCAN::parameter> custom_parameters = {
-    {"NODEID", UAVCAN_PROTOCOL_PARAM_VALUE_INTEGER_VALUE, 69, 0, 127},
+    {"NODEID", UAVCAN_PROTOCOL_PARAM_VALUE_INTEGER_VALUE, 50, 0, 127},
+    {"SENSOR_PRESSURE", UAVCAN_PROTOCOL_PARAM_VALUE_INTEGER_VALUE, 10, 0, 30},
 };
+
 
 DroneCAN dronecan;
 
@@ -115,8 +117,11 @@ void setup()
 
     delay(20);
 
-    pressureSensor.setPressureUnit(AllSensors_AUAV::PressureUnit::PASCAL);
+    pressureSensor.setPressureDiffUnit(AllSensors_AUAV::PressureUnit::PASCAL);
+    pressureSensor.setPressureAbsUnit(AllSensors_AUAV::PressureUnit::PASCAL);
     pressureSensor.setTemperatureUnit(AllSensors_AUAV::TemperatureUnit::KELVIN);
+
+    pressureSensor.setPressureRange(dronecan.getParameter("SENSOR_PRESSURE") * 2); // Multiplied by 2 for the sensor range, as it is 2x the value in inH2O
 
     pressureSensor.readStatus(AllSensors_AUAV::SensorType::DIFFERENTIAL);
     delay(100);
