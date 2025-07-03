@@ -24,22 +24,14 @@ unsigned long now = 0;
 unsigned long last_msg_time_diff = 0;
 unsigned long last_msg_time_abs = 0;
 unsigned long last_msg_time_can = 0;
-
 unsigned long last_air_data_time = 0;
 unsigned long last_baro_time = 0;
-/*
-This function is called when we receive a CAN message, and it's accepted by the shouldAcceptTransfer function.
-We need to do boiler plate code in here to handle parameter updates and so on, but you can also write code to interact with sent messages here.
-*/
+
 static void onTransferReceived(CanardInstance *ins, CanardRxTransfer *transfer)
 {
     DroneCANonTransferReceived(dronecan, ins, transfer);
 }
 
-/*
-For this function, we need to make sure any messages we want to receive follow the following format with
-UAVCAN_EQUIPMENT_AHRS_MAGNETICFIELDSTRENGTH_ID as an example
- */
 static bool shouldAcceptTransfer(const CanardInstance *ins,
                                  uint64_t *out_data_type_signature,
                                  uint16_t data_type_id,
@@ -76,14 +68,14 @@ uint8_t readSensor(AllSensors_AUAV::SensorType type)
         return status;
     }
 
-    // If we haven't received a message in the last 100ms, restart the measurement
+    // If we haven't received a message in the last 300ms, restart the measurement
     if (now - last_msg_time_diff > 300)
     {
         pressureSensor.startMeasurement(AllSensors_AUAV::SensorType::DIFFERENTIAL, AllSensors_AUAV::MeasurementType::AVERAGE16);
         dronecan.debug("No Diff Reading", 0);
         last_msg_time_diff = now;
     }
-    // If we haven't received a message in the last 100ms, restart the measurement
+    // If we haven't received a message in the last 300ms, restart the measurement
     if (now - last_msg_time_abs > 300)
     {
         pressureSensor.startMeasurement(AllSensors_AUAV::SensorType::ABSOLUTE, AllSensors_AUAV::MeasurementType::AVERAGE16);
@@ -95,13 +87,9 @@ uint8_t readSensor(AllSensors_AUAV::SensorType type)
 
 void setup()
 {
-    // to use debugging tools, remove app_setup and set FLASH start from 0x800A000 to 0x8000000 in ldscript.ld
-    // this will over-write the bootloader. To use the bootloader again, reflash it and change above back.
-    app_setup(); // needed for coming from a bootloader, needs to be first in setup
+    app_setup();
     Serial.begin(115200);
-
     IWatchdog.begin(2000000); // if the loop takes longer than 2 seconds, reset the system
-
     dronecan.version_major = 1;
     dronecan.version_minor = 0;
     dronecan.init(
@@ -124,7 +112,7 @@ void setup()
     pressureSensor.setPressureAbsUnit(AllSensors_AUAV::PressureUnit::PASCAL);
     pressureSensor.setTemperatureUnit(AllSensors_AUAV::TemperatureUnit::KELVIN);
     pressureSensor.setPressureRange(dronecan.getParameter("SENSOR_PRESSURE") * 2); // Multiplied by 2 for the sensor range, as it is 2x the value in inH2O
-    
+
     pressureSensor.readStatus(AllSensors_AUAV::SensorType::DIFFERENTIAL);
     delay(100);
     pressureSensor.readStatus(AllSensors_AUAV::SensorType::ABSOLUTE);
@@ -173,7 +161,6 @@ void setup()
         }
 
         // Send barometer messages every 10Hz, every 100ms
-
         if (now - last_baro_time > 100)
         {
             // Send Barometer pressure message
@@ -188,8 +175,6 @@ void setup()
 
             last_baro_time = millis();
         }
-
-
     }
 }
 
