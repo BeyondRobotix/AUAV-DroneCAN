@@ -132,9 +132,21 @@ void setup()
     int sensor_pressure = dronecan.getParameter("SENSOR_PRESSURE");
 
     if(sensor_pressure != 5 && sensor_pressure !=10 && sensor_pressure !=30 && sensor_pressure !=60 && sensor_pressure !=100)
-    {
-        // Send error message
-        dronecan.debug("Configure SENSOR_PRESSURE to 5, 10, 30, 60, or 100 (Based on your sensor)", 1);
+    {   
+        static uint32_t last_error_time = 0;
+        while (true)
+        {
+            dronecan.cycle();
+            IWatchdog.reload();
+        
+            // send message every 10 seconds
+            if (millis() - last_error_time > 10000)
+            {
+                // Send error message
+                dronecan.debug("Configure SENSOR_PRESSURE to 5, 10, 30, 60, or 100 (Based on your sensor)", 1);
+                last_error_time = millis();
+            }
+        }
     }
 
     while (true)
