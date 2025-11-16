@@ -143,7 +143,7 @@ void setup()
             if (millis() - last_error_time > 10000)
             {
                 // Send error message
-                dronecan.debug("Configure SENSOR_PRESSURE to 5, 10, 30, 60, or 100 (Based on your sensor)", 1);
+                dronecan.debug("Configure SENSOR_PRESSURE to 5, 10, 30, 60, or 100 (Based on your sensor)", 3);
                 last_error_time = millis();
             }
         }
