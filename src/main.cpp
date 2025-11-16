@@ -129,6 +129,14 @@ void setup()
     pressureSensor.startMeasurement(AllSensors_AUAV::SensorType::ABSOLUTE, AllSensors_AUAV::MeasurementType::AVERAGE16);
     delay(100);
 
+    int sensor_pressure = dronecan.getParameter("SENSOR_PRESSURE");
+
+    if(sensor_pressure != 5 && sensor_pressure !=10 && sensor_pressure !=30 && sensor_pressure !=60 && sensor_pressure !=100)
+    {
+        // Send error message
+        dronecan.debug("Configure SENSOR_PRESSURE to 5, 10, 30, 60, or 100 (Based on your sensor)", 1);
+    }
+
     while (true)
     {
         const uint32_t now = millis();
