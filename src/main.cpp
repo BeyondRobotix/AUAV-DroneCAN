@@ -1,9 +1,5 @@
 #include <Arduino.h>
 #include <dronecan.h>
-#include <IWatchdog.h>
-#include <app.h>
-#include <vector>
-#include <simple_dronecanmessages.h>
 #include <AllSensors_AUAV.h>
 
 AllSensors_AUAV pressureSensor(&Wire);
@@ -26,21 +22,6 @@ unsigned long last_msg_time_abs = 0;
 unsigned long last_msg_time_can = 0;
 unsigned long last_air_data_time = 0;
 unsigned long last_baro_time = 0;
-
-static void onTransferReceived(CanardInstance *ins, CanardRxTransfer *transfer)
-{
-    DroneCANonTransferReceived(dronecan, ins, transfer);
-}
-
-static bool shouldAcceptTransfer(const CanardInstance *ins,
-                                 uint64_t *out_data_type_signature,
-                                 uint16_t data_type_id,
-                                 CanardTransferType transfer_type,
-                                 uint8_t source_node_id)
-
-{
-    return false || DroneCANshoudlAcceptTransfer(ins, out_data_type_signature, data_type_id, transfer_type, source_node_id);
-}
 
 uint8_t readSensor(AllSensors_AUAV::SensorType type)
 {
@@ -93,8 +74,6 @@ void setup()
     dronecan.version_major = 1;
     dronecan.version_minor = 0;
     dronecan.init(
-        onTransferReceived,
-        shouldAcceptTransfer,
         custom_parameters,
         "com.beyondrobotix.airdata");
 
