@@ -6,8 +6,8 @@ AllSensors_AUAV pressureSensor(&Wire);
 
 // set up your parameters here with default values. NODEID should be kept
 std::vector<DroneCAN::parameter> custom_parameters = {
-    {"NODEID", UAVCAN_PROTOCOL_PARAM_VALUE_INTEGER_VALUE, 50, 0, 127},
-    {"SENSOR_PRESSURE", UAVCAN_PROTOCOL_PARAM_VALUE_INTEGER_VALUE, 10, 0, 30},
+    {"NODEID", DroneCAN::INT, 50, 0, 127},
+    {"SENSOR_PRESSURE", DroneCAN::INT, 10, 0, 30},
 };
 
 DroneCAN dronecan;
@@ -155,7 +155,7 @@ void setup()
             air_data.differential_pressure_sensor_temperature = pressureSensor.temperature_d; // Kelvin
             air_data.static_pressure = pressureSensor.pressure_a;                             // in Pascals
             air_data.static_pressure_sensor_temperature = pressureSensor.temperature_a;       // Kelvin
-            sendUavcanMsg(dronecan.canard, air_data, CANARD_TRANSFER_PRIORITY_HIGH);
+            sendUavcanMsg(dronecan, air_data, CANARD_TRANSFER_PRIORITY_HIGH);
             last_air_data_time = millis();
         }
 
@@ -165,12 +165,12 @@ void setup()
             // Send Barometer pressure message
             uavcan_equipment_air_data_StaticPressure barometer_data{};
             barometer_data.static_pressure = pressureSensor.pressure_a; // in Pascals
-            sendUavcanMsg(dronecan.canard, barometer_data, CANARD_TRANSFER_PRIORITY_HIGH);
+            sendUavcanMsg(dronecan, barometer_data, CANARD_TRANSFER_PRIORITY_HIGH);
 
             // Send Barometer temperature message
             uavcan_equipment_air_data_StaticTemperature temperature_data{};
             temperature_data.static_temperature = pressureSensor.temperature_a; // in Kelvin
-            sendUavcanMsg(dronecan.canard, temperature_data, CANARD_TRANSFER_PRIORITY_HIGH);
+            sendUavcanMsg(dronecan, temperature_data, CANARD_TRANSFER_PRIORITY_HIGH);
 
             last_baro_time = millis();
         }
